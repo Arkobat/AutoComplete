@@ -1,71 +1,118 @@
 package io.github.arkobat.autocomplete;
 
 import io.github.arkobat.autocomplete.model.Field;
+import io.github.arkobat.autocomplete.model.Word;
+import javafx.scene.input.KeyCode;
+import lombok.Getter;
 
 import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Config {
 
-    private static List<Field> buttons = new ArrayList<>();
-    private static Map<Integer, List<String>> words = new HashMap<>();
+    @Getter
+    private static String buttonsFileContent = "";
 
-    public static List<Field> loadButtons() throws IOException {
-        buttons.clear();
-        words.clear();
-        URL url = new URL("https://tickets.arkobat.com/buttons.txt");
-        BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+    @Getter
+    private static List<Field> fields = new ArrayList<>();
+    private static List<Word> words = new ArrayList<>();
+
+    private static boolean createFile = false;
+
+    private static void createFile(String pathName) throws IOException {
+        BufferedReader br = null;
+        try {
+             br = new BufferedReader(new FileReader(pathName));
+        } catch (FileNotFoundException ignored){
+        }
+        if (br != null) {
+            return;
+        }
+        InputStream in = Main.class.getClassLoader().getResourceAsStream(pathName);
+        br = new BufferedReader(new InputStreamReader(in));
+        FileWriter fileWriter = new FileWriter(pathName);
+        String s = br.readLine();
+        while (s != null) {
+            fileWriter.write(s + "\n");
+            s = br.readLine();
+        }
+        fileWriter.flush();
+        fileWriter.close();
+    }
+
+    public static void loadButtons() throws IOException {
+        createFile("buttons.csv");
+        createFile("words.csv");
+
+        BufferedReader br = new BufferedReader(new FileReader("buttons.csv"));
+
+        String input = br.readLine();
         int i = 1;
-        String input = in.readLine();
         while (input != null) {
-            buttons.add(new Field(i++, input.split(":")));
-            input = in.readLine();
+            buttonsFileContent += input + "\n";
+            String[] split = input.split(";");
+            fields.add(new Field(KeyCode.valueOf(split[0]), i++, Arrays.copyOfRange(split, 1, split.length)));
+            input = br.readLine();
         }
-        in.close();
+        br.close();
         Config.loadWords();
-        return buttons;
     }
 
-    public static void loadWords() throws IOException {
-        URL url = new URL("https://tickets.arkobat.com/words.txt");
-        BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
-        String input = in.readLine();
+    private static void loadWords() throws IOException {
+        BufferedReader br = new BufferedReader(new FileReader("words.csv"));
+        String input = br.readLine();
         while (input != null) {
-            for (int i = 0; i < buttons.size(); i++) {
-                String finalInput = input;
-                if (Arrays.stream(buttons.get(i).getLetters()).anyMatch(l -> l.equalsIgnoreCase(finalInput.split("")[0]))) {
-                    if (words.containsKey(i + 1)) {
-                        List<String> list = words.get(i + 1);
-                        list.add(input);
-                        words.put(i + 1, list);
-                    } else {
-                        List<String> list = new ArrayList<>();
-                        list.add(input);
-                        words.put(i + 1, list);
-                    }
-                    break;
-                }
-            }
-            input = in.readLine();
+            String[] split = input.split(";");
+            Word word = new Word(split[0], Integer.parseInt(split[1]));
+            words.add(word);
+            input = br.readLine();
         }
-        in.close();
+        br.close();
     }
 
-    public static Field getButton(int i) {
-        return buttons.stream().filter(bu -> bu.getId() == i).findFirst().orElse(null);
+    public static Field getField(int i) {
+        return fields.stream().filter(bu -> bu.getId() == i).findFirst().orElse(null);
     }
 
-    public static String[] getButtonValues(int buttonId) {
-        Field b = buttons.stream().filter(bu -> bu.getId() == buttonId).findFirst().orElse(null);
-        return b != null ? b.getLetters() : null;
+    public static Field getField(KeyCode key) {
+        return fields.stream().filter(bu -> bu.getKeyCode() == key).findFirst().orElse(null);
     }
 
-    public static List<String> getWordList(int i) {
+    public static List<Word> getWordList(Field field) {
         if (words == null) {
-        } else {
+            return null;
         }
-        return words.get(i);
+        return words.stream().filter(w -> Arrays.stream(field.getLetters()).anyMatch(c -> w.getWord().split("")[0].equalsIgnoreCase(c))).collect(Collectors.toList());
+    }
+
+    public static void addUse(Word word) {
+        word.addUse();
+        for (int i = 0; i < words.size(); i++) {
+            if (words.get(i) == word) {
+                words.set(i, word);
+                return;
+            }
+        }
+    }
+
+    public static void updateButtonFile(String text) {
+        try {
+            fields.clear();
+            buttonsFileContent = "";
+            FileWriter fileWriter = new FileWriter("buttons.csv");
+            int i = 1;
+            for (String s : text.split("\n")) {
+                fileWriter.write(s + "\n");
+                buttonsFileContent += s + "\n";
+                String[] split = s.split(";");
+                fields.add(new Field(KeyCode.valueOf(split[0]), i++, Arrays.copyOfRange(split, 1, split.length)));
+            }
+            fileWriter.flush();
+            fileWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

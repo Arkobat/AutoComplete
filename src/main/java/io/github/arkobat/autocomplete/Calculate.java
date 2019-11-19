@@ -1,36 +1,37 @@
 package io.github.arkobat.autocomplete;
 
 import io.github.arkobat.autocomplete.model.Field;
+import io.github.arkobat.autocomplete.model.Word;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Calculate {
 
-    private List<String> words = new ArrayList<>();
+    private List<Word> words = new ArrayList<>();
     private List<Field> usedFields = new ArrayList<>();
     private int charIndex = 0;
 
     public Calculate nextButton(Field button) {
         if (charIndex == 0) {
-            words.addAll(Config.getWordList(button.getId()));
+            words.addAll(Objects.requireNonNull(Config.getWordList(button)));
         } else {
             words = words.stream().filter(w -> {
-                if (w.length() <= charIndex) {
+                if (w.getWord().length() <= charIndex) {
                     return false;
                 }
-                String nextChar = w.split("")[charIndex];
+                String nextChar = w.getWord().split("")[charIndex];
                 return Arrays.stream(button.getLetters()).anyMatch(l -> l.equalsIgnoreCase(nextChar));
             }).collect(Collectors.toList());
+            words.sort(Word::compareTo);
+
         }
         this.usedFields.add(button);
         charIndex++;
         return this;
     }
 
-    public List<String> getWords() {
+    public List<Word> getWords() {
         return this.words;
     }
 
@@ -44,5 +45,11 @@ public class Calculate {
         this.words.clear();
         this.usedFields.clear();
         tempFields.forEach(this::nextButton);
+    }
+
+    public void clear() {
+        this.charIndex = 0;
+        this.words.clear();
+        this.usedFields.clear();
     }
 }
